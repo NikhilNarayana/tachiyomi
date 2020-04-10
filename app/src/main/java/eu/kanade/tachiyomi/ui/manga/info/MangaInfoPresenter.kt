@@ -9,6 +9,7 @@ import eu.kanade.tachiyomi.data.database.models.Category
 import eu.kanade.tachiyomi.data.database.models.Manga
 import eu.kanade.tachiyomi.data.database.models.MangaCategory
 import eu.kanade.tachiyomi.data.download.DownloadManager
+import eu.kanade.tachiyomi.data.preference.PreferencesHelper
 import eu.kanade.tachiyomi.source.Source
 import eu.kanade.tachiyomi.ui.base.presenter.BasePresenter
 import eu.kanade.tachiyomi.util.lang.isNullOrUnsubscribed
@@ -19,6 +20,7 @@ import rx.android.schedulers.AndroidSchedulers
 import rx.schedulers.Schedulers
 import uy.kohesive.injekt.Injekt
 import uy.kohesive.injekt.api.get
+import uy.kohesive.injekt.injectLazy
 
 /**
  * Presenter of MangaInfoFragment.
@@ -45,6 +47,8 @@ class MangaInfoPresenter(
      * Subscription to update the manga from the source.
      */
     private var fetchMangaSubscription: Subscription? = null
+
+    private val preferences: PreferencesHelper by injectLazy()
 
     override fun onCreate(savedState: Bundle?) {
         super.onCreate(savedState)
@@ -112,7 +116,23 @@ class MangaInfoPresenter(
         if (manga.favorite == favorite) {
             return
         }
-        toggleFavorite()
+        if (manga.favorite) {
+            toggleFavorite()
+        } else {
+            val categories = this.getCategories()
+            val defaultCategoryId = preferences.defaultCategory()
+            val defaultCategory = categories.find { it.id == defaultCategoryId }
+            when {
+                defaultCategory != null -> {
+                    toggleFavorite()
+                    this.moveMangaToCategory(manga, defaultCategory)
+                }
+                defaultCategoryId == 0 || categories.isEmpty() -> {
+                    toggleFavorite()
+                    this.moveMangaToCategory(manga, null)
+                }
+            }
+        }
     }
 
     /**
